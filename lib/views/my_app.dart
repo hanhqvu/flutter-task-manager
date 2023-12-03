@@ -1,4 +1,25 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import '../utils/error.dart';
+import '../utils/network_manager.dart';
+
+import '../models/category.dart';
+
+const errorMessage = {
+  NetworkError.serverError: '''
+      Our server is currently experience problems. Please wait a moment and try again.
+      If the problems persist, please contact our support for more help.
+      ''',
+  NetworkError.parseError: '''
+    Our server is currently experience problems. Please wait a moment and try again.
+    If the problems persist, please contact our support for more help.
+      ''',
+  NetworkError.unknownError: '''
+    An unexpected problem has happen. Please wait a moment and try again.
+    If the problems persist, please contact our support for more help.
+    '''
+};
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -27,7 +48,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const MyHomePage(title: 'Tasks Manager'),
     );
   }
 }
@@ -47,21 +68,18 @@ class MyHomePage extends StatefulWidget {
   final String title;
 
   @override
+  // State<MyHomePage> createState() => _MyHomePageState();
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
+  final networkManager = NetworkManager.instance;
+  late final Future<List<Category>> futureCategories;
 
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  @override
+  void initState() {
+    super.initState();
+    futureCategories = getCategories();
   }
 
   @override
@@ -83,39 +101,46 @@ class _MyHomePageState extends State<MyHomePage> {
         title: Text(widget.title),
       ),
       body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'You have pushed the button this many times:',
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
+        child: FutureBuilder<List<Category>>(
+          future: futureCategories,
+          builder: (context, snapshot) {
+            if (snapshot.hasData) {
+              final data = snapshot.data;
+              if (data != null && data.isNotEmpty) {
+                return ListView.builder(
+                  itemCount: data.length,
+                  prototypeItem: ListTile(
+                    title: Text(data.first.name),
+                  ),
+                  itemBuilder: (context, index) {
+                    return ListTile(
+                      title: Text(data[index].name),
+                    );
+                  },
+                );
+              } else if (data != null && data.isEmpty) {
+                return Text('No categories');
+              }
+            }
+            if (snapshot.hasError) {
+              late NetworkError error;
+              if (snapshot.error != null && snapshot.error is NetworkError) {
+                error = snapshot.error as NetworkError;
+              }
+              return Text(errorMessage[error] ?? '');
+            }
+
+            // By default, show a loading spinner.
+            return const CircularProgressIndicator();
+          },
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
       ), // This trailing comma makes auto-formatting nicer for build methods.
     );
+  }
+
+  Future<List<Category>> getCategories() async {
+    final fetchResult = await networkManager.fetchCategories();
+    return fetchResult.match(
+        (error) => Future.error(error), (value) => Future.value(value));
   }
 }
