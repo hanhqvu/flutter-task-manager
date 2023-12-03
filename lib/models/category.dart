@@ -1,21 +1,36 @@
+import 'package:fpdart/fpdart.dart';
+import 'package:task_manager/utils/error.dart';
+
 class Category {
-  String id;
+  final int id;
   String name;
-  DateTime createdAt;
+  final DateTime createdAt;
   DateTime updatedAt;
 
   Category(this.id, this.name, this.createdAt, this.updatedAt);
 
-  Category.fromJson(Map<String, dynamic> json)
-      : id = json['id'] as String,
-        name = json['name'] as String,
-        createdAt = json['createdAt'] as DateTime,
-        updatedAt = json['updatedAt'] as DateTime;
+  static Either<JsonParseError, Category> fromJson(Map<String, dynamic> json) {
+    final id = json['id'];
+    final name = json['name'];
+    DateTime createdAt;
+    DateTime updatedAt;
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'createdAt': createdAt,
-        'updatedAt': updatedAt,
-      };
+    if (json.keys.toList() == ['id', 'name', 'createdAt', 'updatedAt']) {
+      return Either.left(JsonParseError.missingKeyError);
+    }
+    if (json.containsValue(null)) {
+      return Either.left(JsonParseError.nullValueError);
+    }
+    if (id is! int || name is! String) {
+      return Either.left(JsonParseError.typeError);
+    } else {
+      try {
+        createdAt = DateTime.parse(json['createdAt']);
+        updatedAt = DateTime.parse(json['createdAt']);
+      } catch (exception) {
+        return Either.left(JsonParseError.typeError);
+      }
+    }
+    return Either.right(Category(id, name, createdAt, updatedAt));
+  }
 }
